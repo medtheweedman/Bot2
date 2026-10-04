@@ -49,8 +49,9 @@ export interface AuthSessionStatus {
 
 export interface AccessCodeInput {
   /**
-     * @minLength 1
-     * @maxLength 128
+     * @minLength 4
+     * @maxLength 4
+     * @pattern ^[0-9]{4}$
      */
   code: string;
 }

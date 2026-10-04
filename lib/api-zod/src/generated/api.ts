@@ -56,12 +56,15 @@ export const GetAuthSessionResponse = zod.object({
 /**
  * @summary Sign in with the workspace access code
  */
-export const createAuthSessionBodyCodeMax = 128;
+export const createAuthSessionBodyCodeMin = 4;
+export const createAuthSessionBodyCodeMax = 4;
 
+
+export const createAuthSessionBodyCodeRegExp = new RegExp('^[0-9]{4}$');
 
 
 export const CreateAuthSessionBody = zod.object({
-  "code": zod.string().min(1).max(createAuthSessionBodyCodeMax)
+  "code": zod.string().min(createAuthSessionBodyCodeMin).max(createAuthSessionBodyCodeMax).regex(createAuthSessionBodyCodeRegExp)
 })
 
 export const CreateAuthSessionResponse = zod.object({

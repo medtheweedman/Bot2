@@ -3,16 +3,17 @@ import type { Request, RequestHandler } from "express";
 
 const COOKIE_NAME = "creator_studio_access";
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
-const MIN_SECRET_LENGTH = 32;
+const MIN_SESSION_SECRET_LENGTH = 32;
+const FOUR_DIGIT_PIN_PATTERN = /^[0-9]{4}$/;
 
 function getSigningKey(): string | null {
   const secret = process.env.SESSION_SECRET;
-  return secret && secret.length >= MIN_SECRET_LENGTH ? secret : null;
+  return secret && secret.length >= MIN_SESSION_SECRET_LENGTH ? secret : null;
 }
 
 export function hasConfiguredAccessCode(): boolean {
   const code = process.env.WHATSAPP_ACCESS_CODE;
-  return !!code && code.length >= MIN_SECRET_LENGTH && !!getSigningKey();
+  return !!code && code.length === 4 && FOUR_DIGIT_PIN_PATTERN.test(code) && !!getSigningKey();
 }
 
 function sign(payload: string, key: string): string {
