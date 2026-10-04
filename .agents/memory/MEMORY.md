@@ -1,1 +1,2 @@
 - [Private GitHub imports](private-github-imports.md) — use the authenticated connector for private repos; avoid bursty file requests.
+- [Artifact Vite builds](artifact-vite-builds.md) — standalone production builds need the artifact workflow’s `PORT` and `BASE_PATH` values.
