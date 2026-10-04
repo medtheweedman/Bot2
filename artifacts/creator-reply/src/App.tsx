@@ -1,14 +1,24 @@
 import { useState, type FormEvent } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { useDraftCreatorReply, useHealthCheck } from '@workspace/api-client-react';
 import type { CreatorReplyInput, CreatorReplyInputTone } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
+import WhatsAppPage from '@/pages/whatsapp';
+import { Route, Switch, useLocation, Router as WouterRouter, Link } from 'wouter';
+import {
+  getGetAuthSessionQueryKey,
+  getGetWhatsAppStatusQueryKey,
+  getListWhatsAppContactsQueryKey,
+  useCreateAuthSession,
+  useDeleteAuthSession,
+  useGetAuthSession,
+} from '@workspace/api-client-react';
 import {
   AlertCircle,
+  ArrowRight,
   Check,
   CheckCheck,
   CircleHelp,
@@ -16,6 +26,7 @@ import {
   Feather,
   LockKeyhole,
   MessageCircle,
+  MessageSquareText,
   RotateCcw,
   Sparkles,
   WandSparkles,
@@ -373,9 +384,77 @@ function Router() {
     <RoutedErrorBoundary>
       <Switch>
         <Route path="/" component={Home} />
+        <Route path="/whatsapp" component={WhatsAppPage} />
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>
+  );
+}
+
+function errorMessage(error: unknown): string {
+  if (error && typeof error === 'object' && 'data' in error) {
+    const data = (error as { data?: unknown }).data;
+    if (data && typeof data === 'object' && 'error' in data) {
+      const message = (data as { error?: unknown }).error;
+      if (typeof message === 'string') return message;
+    }
+  }
+  if (error instanceof Error) return error.message.replace(/^HTTP \d{3}\s*[^:]*:\s*/, '');
+  return 'Something went wrong. Please try again.';
+}
+
+function AccessGate() {
+  const [code, setCode] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [currentLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const session = useGetAuthSession();
+  const signIn = useCreateAuthSession();
+  const signOut = useDeleteAuthSession();
+
+  if (session.isLoading) {
+    return <main className="studio-grain min-h-[100dvh] p-6"><div className="mx-auto mt-24 max-w-md space-y-4" role="status" aria-label="Checking workspace access" data-testid="status-auth-loading"><div className="skeleton h-8 w-2/3 rounded-lg" /><div className="skeleton h-24 rounded-2xl" /><div className="skeleton h-12 rounded-lg" /></div></main>;
+  }
+  if (session.isError) {
+    return <main className="studio-grain min-h-[100dvh] p-6"><section className="mx-auto mt-24 max-w-md rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6" data-testid="status-auth-error"><h1 className="font-serif text-2xl">Workspace access is unavailable</h1><p className="mt-3 text-sm leading-relaxed text-muted-foreground">We couldn’t check your studio session. Please check the service connection and try again.</p><button type="button" onClick={() => session.refetch()} data-testid="button-retry-auth" className="mt-5 rounded-lg bg-[hsl(var(--primary))] px-4 py-2.5 text-sm font-semibold text-[hsl(var(--primary-foreground))]">Try again</button></section></main>;
+  }
+  if (!session.data?.authenticated) {
+    const setupUnavailable = signIn.isError && /not configured|unavailable yet/i.test(errorMessage(signIn.error));
+    return (
+      <main className="studio-grain min-h-[100dvh] px-5 py-10 sm:grid sm:place-items-center">
+        <section className="reveal w-full max-w-[460px] rounded-[20px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 shadow-[var(--shadow-sm)] sm:p-8">
+          <div className="mb-7 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"><Feather size={19} /></span><div><p className="font-serif text-xl font-semibold tracking-tight">reply studio</p><p className="font-mono text-[9px] uppercase tracking-[.16em] text-muted-foreground">a private creator workspace</p></div></div>
+          <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[.14em] text-[hsl(var(--primary))]"><LockKeyhole size={13} /> Private by design</div>
+          <h1 className="font-serif text-[30px] leading-tight tracking-[-.03em]">A little space, just for you.</h1>
+          <p className="mt-3 text-[13px] leading-[1.7] text-muted-foreground">Enter the workspace access code to open your reply drafts and WhatsApp settings. The code is sent securely for sign-in and is not saved in this browser.</p>
+          <form onSubmit={(event) => { event.preventDefault(); setSubmitError(''); signIn.mutate({ data: { code } }, { onSuccess: () => { setCode(''); void queryClient.invalidateQueries({ queryKey: getGetAuthSessionQueryKey() }); }, onError: (error) => setSubmitError(errorMessage(error)) }); }} className="mt-6 space-y-3">
+            <label htmlFor="workspace-code" className="block text-[11px] font-semibold">Access code</label>
+            <input id="workspace-code" type="password" autoComplete="current-password" value={code} onChange={(event) => setCode(event.target.value)} required maxLength={128} data-testid="input-access-code" placeholder="Your private code" className="h-11 w-full rounded-[10px] border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3.5 text-sm outline-none focus:border-[hsl(var(--primary)/.55)] focus:ring-2 focus:ring-[hsl(var(--primary)/.08)]" />
+            {submitError && <div role="alert" data-testid="status-auth-submit-error" className="rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2.5 text-[11px] leading-relaxed text-[hsl(var(--destructive))]">{submitError}</div>}
+            {setupUnavailable && <div role="alert" data-testid="status-access-code-setup" className="rounded-lg border border-[hsl(var(--accent-foreground)/.16)] bg-[hsl(var(--accent)/.55)] p-3 text-[11px] leading-relaxed text-[hsl(var(--accent-foreground))]"><strong>Workspace sign-in is not configured.</strong> The project owner needs to add <code className="font-mono">WHATSAPP_ACCESS_CODE</code> in Replit Secrets (at least 32 characters). Do not put it in frontend code.</div>}
+            {signIn.isError && !setupUnavailable && <p role="alert" className="text-[11px] text-[hsl(var(--destructive))]">{errorMessage(signIn.error)}</p>}
+            <button type="submit" disabled={signIn.isPending || !code.trim()} data-testid="button-access-sign-in" className="flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[hsl(var(--primary))] text-sm font-bold text-[hsl(var(--primary-foreground))] transition hover:brightness-105 disabled:opacity-60">{signIn.isPending ? 'Checking access…' : <>Enter workspace <ArrowRight size={15} /></>}</button>
+          </form>
+          {!setupUnavailable && <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">Don’t have a code yet? The project owner must set <code className="font-mono">WHATSAPP_ACCESS_CODE</code> in Replit Secrets. This is separate from your WhatsApp password and pairing QR.</p>}
+          <p className="mt-5 border-t border-[hsl(var(--border))] pt-4 text-[10px] leading-relaxed text-muted-foreground">Your access code protects every studio operation. It never appears in the workspace interface after sign-in.</p>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <div className="min-h-[100dvh]">
+      <nav aria-label="Studio navigation" className="relative z-20 border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.96)]">
+        <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-3 px-5 py-3 sm:px-8 lg:px-12">
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+            <Link href="/" data-testid="link-nav-drafts" className={`flex items-center gap-2 rounded-full px-3 py-2 text-[11px] font-semibold transition ${currentLocation === '/' ? 'bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]' : 'text-muted-foreground hover:bg-[hsl(var(--muted))] hover:text-foreground'}`}><Feather size={14} /><span>Draft replies</span></Link>
+            <Link href="/whatsapp" data-testid="link-nav-whatsapp" className={`flex items-center gap-2 rounded-full px-3 py-2 text-[11px] font-semibold transition ${currentLocation === '/whatsapp' ? 'bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]' : 'text-muted-foreground hover:bg-[hsl(var(--muted))] hover:text-foreground'}`}><MessageSquareText size={14} /><span>WhatsApp</span></Link>
+          </div>
+          <button type="button" onClick={() => signOut.mutate(undefined, { onSuccess: () => { queryClient.removeQueries({ queryKey: getGetWhatsAppStatusQueryKey() }); queryClient.removeQueries({ queryKey: getListWhatsAppContactsQueryKey() }); void queryClient.invalidateQueries({ queryKey: getGetAuthSessionQueryKey() }); } })} disabled={signOut.isPending} data-testid="button-sign-out" className="shrink-0 rounded-full border border-[hsl(var(--border))] px-3 py-2 text-[10px] font-semibold text-muted-foreground transition hover:text-foreground disabled:opacity-50">{signOut.isPending ? 'Leaving…' : 'Sign out'}</button>
+        </div>
+      </nav>
+      <Router />
+    </div>
   );
 }
 
@@ -389,7 +468,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <Router />
+          <AccessGate />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
