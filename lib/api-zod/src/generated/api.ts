@@ -234,3 +234,129 @@ export const DeleteWhatsAppContactParams = zod.object({
 export const DeleteWhatsAppContactResponse = zod.void()
 
 
+/**
+ * @summary List incoming messages waiting for review
+ */
+
+export const listWhatsAppInboxResponseDisplayNameMax = 80;
+
+export const listWhatsAppInboxResponseMessageTextMax = 4000;
+
+export const listWhatsAppInboxResponseReplyDraftMax = 4000;
+
+
+
+export const ListWhatsAppInboxResponseItem = zod.object({
+  "id": zod.number().int().min(1),
+  "phoneNumber": zod.string(),
+  "displayName": zod.string().max(listWhatsAppInboxResponseDisplayNameMax).nullable(),
+  "messageText": zod.string().max(listWhatsAppInboxResponseMessageTextMax),
+  "replyDraft": zod.string().max(listWhatsAppInboxResponseReplyDraftMax).nullable(),
+  "status": zod.enum(['pending', 'sending', 'uncertain']),
+  "receivedAt": zod.coerce.date()
+})
+export const ListWhatsAppInboxResponse = zod.array(ListWhatsAppInboxResponseItem)
+
+
+/**
+ * @summary Generate and save a reply draft for an incoming message
+ */
+
+
+
+export const GenerateWhatsAppInboxDraftParams = zod.object({
+  "inboxId": zod.coerce.number().int().min(1)
+})
+
+
+export const generateWhatsAppInboxDraftResponseDisplayNameMax = 80;
+
+export const generateWhatsAppInboxDraftResponseMessageTextMax = 4000;
+
+export const generateWhatsAppInboxDraftResponseReplyDraftMax = 4000;
+
+
+
+export const GenerateWhatsAppInboxDraftResponse = zod.object({
+  "id": zod.number().int().min(1),
+  "phoneNumber": zod.string(),
+  "displayName": zod.string().max(generateWhatsAppInboxDraftResponseDisplayNameMax).nullable(),
+  "messageText": zod.string().max(generateWhatsAppInboxDraftResponseMessageTextMax),
+  "replyDraft": zod.string().max(generateWhatsAppInboxDraftResponseReplyDraftMax).nullable(),
+  "status": zod.enum(['pending', 'sending', 'uncertain']),
+  "receivedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Save an edited reply draft
+ */
+
+
+
+export const SaveWhatsAppInboxDraftParams = zod.object({
+  "inboxId": zod.coerce.number().int().min(1)
+})
+
+export const saveWhatsAppInboxDraftBodyReplyMax = 4000;
+
+
+
+export const SaveWhatsAppInboxDraftBody = zod.object({
+  "reply": zod.string().min(1).max(saveWhatsAppInboxDraftBodyReplyMax)
+})
+
+
+export const saveWhatsAppInboxDraftResponseDisplayNameMax = 80;
+
+export const saveWhatsAppInboxDraftResponseMessageTextMax = 4000;
+
+export const saveWhatsAppInboxDraftResponseReplyDraftMax = 4000;
+
+
+
+export const SaveWhatsAppInboxDraftResponse = zod.object({
+  "id": zod.number().int().min(1),
+  "phoneNumber": zod.string(),
+  "displayName": zod.string().max(saveWhatsAppInboxDraftResponseDisplayNameMax).nullable(),
+  "messageText": zod.string().max(saveWhatsAppInboxDraftResponseMessageTextMax),
+  "replyDraft": zod.string().max(saveWhatsAppInboxDraftResponseReplyDraftMax).nullable(),
+  "status": zod.enum(['pending', 'sending', 'uncertain']),
+  "receivedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Send a reviewed reply to an incoming message
+ */
+
+
+
+export const SendWhatsAppInboxReplyParams = zod.object({
+  "inboxId": zod.coerce.number().int().min(1)
+})
+
+export const sendWhatsAppInboxReplyBodyReplyMax = 4000;
+
+
+
+export const SendWhatsAppInboxReplyBody = zod.object({
+  "reply": zod.string().min(1).max(sendWhatsAppInboxReplyBodyReplyMax)
+})
+
+export const SendWhatsAppInboxReplyResponse = zod.void()
+
+
+/**
+ * @summary Dismiss a message from the review inbox
+ */
+
+
+
+export const DismissWhatsAppInboxMessageParams = zod.object({
+  "inboxId": zod.coerce.number().int().min(1)
+})
+
+export const DismissWhatsAppInboxMessageResponse = zod.void()
+
+

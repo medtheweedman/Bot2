@@ -221,6 +221,133 @@ paths:
           description: Access code session required
         "404":
           description: Contact not found
+  /whatsapp/inbox:
+    get:
+      operationId: listWhatsAppInbox
+      tags: [whatsapp]
+      summary: List incoming messages waiting for review
+      responses:
+        "200":
+          description: Pending incoming messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsAppInboxMessageList"
+        "401":
+          description: Access code session required
+  /whatsapp/inbox/{inboxId}/draft:
+    post:
+      operationId: generateWhatsAppInboxDraft
+      tags: [whatsapp]
+      summary: Generate and save a reply draft for an incoming message
+      parameters:
+        - name: inboxId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Generated reply draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsAppInboxMessage"
+        "400":
+          description: Creator details are incomplete
+        "401":
+          description: Access code session required
+        "404":
+          description: Message not found
+        "409":
+          description: Message is no longer waiting for review
+        "503":
+          description: Gemini is not configured or is unavailable
+    patch:
+      operationId: saveWhatsAppInboxDraft
+      tags: [whatsapp]
+      summary: Save an edited reply draft
+      parameters:
+        - name: inboxId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhatsAppInboxReplyInput"
+      responses:
+        "200":
+          description: Saved reply draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsAppInboxMessage"
+        "400":
+          description: Invalid reply draft
+        "401":
+          description: Access code session required
+        "404":
+          description: Message not found
+        "409":
+          description: Message is no longer waiting for review
+  /whatsapp/inbox/{inboxId}/send:
+    post:
+      operationId: sendWhatsAppInboxReply
+      tags: [whatsapp]
+      summary: Send a reviewed reply to an incoming message
+      parameters:
+        - name: inboxId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhatsAppInboxReplyInput"
+      responses:
+        "204":
+          description: Reviewed reply sent
+        "400":
+          description: Invalid reply
+        "401":
+          description: Access code session required
+        "404":
+          description: Message not found
+        "409":
+          description: Message is already being handled or contact is no longer approved
+        "503":
+          description: WhatsApp is unavailable or send status could not be confirmed
+  /whatsapp/inbox/{inboxId}:
+    delete:
+      operationId: dismissWhatsAppInboxMessage
+      tags: [whatsapp]
+      summary: Dismiss a message from the review inbox
+      parameters:
+        - name: inboxId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "204":
+          description: Message dismissed
+        "401":
+          description: Access code session required
+        "404":
+          description: Message not found
+        "409":
+          description: Message is currently being sent
 components:
   schemas:
     HealthStatus:
@@ -360,4 +487,40 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/WhatsAppContact"
+    WhatsAppInboxMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        phoneNumber:
+          type: string
+        displayName:
+          type: ["string", "null"]
+          maxLength: 80
+        messageText:
+          type: string
+          maxLength: 4000
+        replyDraft:
+          type: ["string", "null"]
+          maxLength: 4000
+        status:
+          type: string
+          enum: [pending, sending, uncertain]
+        receivedAt:
+          type: string
+          format: date-time
+      required: [id, phoneNumber, displayName, messageText, replyDraft, status, receivedAt]
+    WhatsAppInboxMessageList:
+      type: array
+      items:
+        $ref: "#/components/schemas/WhatsAppInboxMessage"
+    WhatsAppInboxReplyInput:
+      type: object
+      properties:
+        reply:
+          type: string
+          minLength: 1
+          maxLength: 4000
+      required: [reply]
 

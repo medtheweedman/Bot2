@@ -1,19 +1,36 @@
 import { Router, type IRouter } from "express";
-import { count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, ne } from "drizzle-orm";
 import {
   AddWhatsAppContactBody,
   AddWhatsAppContactResponse,
   DeleteWhatsAppContactParams,
+  DismissWhatsAppInboxMessageParams,
+  GenerateWhatsAppInboxDraftParams,
+  GenerateWhatsAppInboxDraftResponse,
   GetWhatsAppStatusResponse,
+  ListWhatsAppInboxResponse,
   ListWhatsAppContactsResponse,
+  SaveWhatsAppInboxDraftBody,
+  SaveWhatsAppInboxDraftParams,
+  SaveWhatsAppInboxDraftResponse,
+  SendWhatsAppInboxReplyBody,
+  SendWhatsAppInboxReplyParams,
   UpdateWhatsAppSettingsBody,
 } from "@workspace/api-zod";
 import {
   db,
   whatsAppContactsTable,
+  whatsAppInboxTable,
   whatsAppSettingsTable,
 } from "@workspace/db";
-import { whatsAppManager } from "../lib/whatsapp-manager";
+import {
+  WhatsAppInboxActionError,
+  whatsAppManager,
+} from "../lib/whatsapp-manager";
+import {
+  CreatorReplyServiceError,
+  generateCreatorReply,
+} from "../lib/creator-reply-service";
 
 const router: IRouter = Router();
 
@@ -21,6 +38,20 @@ function normalizePhoneNumber(input: string): string | null {
   if (!/^[+\d\s().-]+$/.test(input)) return null;
   const digits = input.replace(/\D/g, "");
   return /^\d{7,15}$/.test(digits) ? digits : null;
+}
+
+function formatInboxMessage(
+  message: typeof whatsAppInboxTable.$inferSelect,
+) {
+  return {
+    id: message.id,
+    phoneNumber: `+${message.phoneNumber}`,
+    displayName: message.displayName,
+    messageText: message.messageText,
+    replyDraft: message.replyDraft,
+    status: message.status,
+    receivedAt: message.receivedAt.toISOString(),
+  };
 }
 
 router.get("/whatsapp/status", async (_req, res): Promise<void> => {
@@ -199,5 +230,194 @@ router.delete("/whatsapp/contacts/:contactId", async (req, res): Promise<void> =
 
   res.status(204).send();
 });
+
+router.get("/whatsapp/inbox", async (_req, res): Promise<void> => {
+  const messages = await db
+    .select()
+    .from(whatsAppInboxTable)
+    .orderBy(desc(whatsAppInboxTable.receivedAt))
+    .limit(100);
+  res.json(ListWhatsAppInboxResponse.parse(messages.map(formatInboxMessage)));
+});
+
+router.post(
+  "/whatsapp/inbox/:inboxId/draft",
+  async (req, res): Promise<void> => {
+    const params = GenerateWhatsAppInboxDraftParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid inbox message." });
+      return;
+    }
+
+    const [message] = await db
+      .select()
+      .from(whatsAppInboxTable)
+      .where(eq(whatsAppInboxTable.id, params.data.inboxId))
+      .limit(1);
+    if (!message) {
+      res.status(404).json({ error: "This message is no longer in the inbox." });
+      return;
+    }
+    if (message.status !== "pending") {
+      res.status(409).json({ error: "This message is no longer waiting for review." });
+      return;
+    }
+
+    const settings = await whatsAppManager.getStatus();
+    if (!settings.creatorName.trim()) {
+      res.status(400).json({
+        error: "Add your creator name in WhatsApp settings before drafting a reply.",
+      });
+      return;
+    }
+
+    let reply: string;
+    try {
+      reply = await generateCreatorReply(
+        {
+          question: message.messageText,
+          adultConfirmed: true,
+          personaName: settings.creatorName,
+          tone: settings.tone,
+          ...(message.displayName ? { clientName: message.displayName } : {}),
+          ...(settings.personaNotes
+            ? { personaNotes: settings.personaNotes }
+            : {}),
+        },
+        req.log,
+      );
+    } catch (error) {
+      if (error instanceof CreatorReplyServiceError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      req.log.error({ err: error }, "Could not generate a WhatsApp reply draft.");
+      res.status(503).json({ error: "A reply draft could not be generated right now." });
+      return;
+    }
+
+    const [updated] = await db
+      .update(whatsAppInboxTable)
+      .set({ replyDraft: reply, updatedAt: new Date() })
+      .where(
+        and(
+          eq(whatsAppInboxTable.id, params.data.inboxId),
+          eq(whatsAppInboxTable.status, "pending"),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      res.status(409).json({ error: "This message is no longer waiting for review." });
+      return;
+    }
+
+    res.json(
+      GenerateWhatsAppInboxDraftResponse.parse(formatInboxMessage(updated)),
+    );
+  },
+);
+
+router.patch(
+  "/whatsapp/inbox/:inboxId/draft",
+  async (req, res): Promise<void> => {
+    const params = SaveWhatsAppInboxDraftParams.safeParse(req.params);
+    const body = SaveWhatsAppInboxDraftBody.safeParse(req.body);
+    if (!params.success || !body.success || !body.data.reply.trim()) {
+      res.status(400).json({ error: "Enter a reply of 1–4000 characters." });
+      return;
+    }
+
+    const [updated] = await db
+      .update(whatsAppInboxTable)
+      .set({ replyDraft: body.data.reply.trim(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(whatsAppInboxTable.id, params.data.inboxId),
+          eq(whatsAppInboxTable.status, "pending"),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      const [existing] = await db
+        .select({ status: whatsAppInboxTable.status })
+        .from(whatsAppInboxTable)
+        .where(eq(whatsAppInboxTable.id, params.data.inboxId))
+        .limit(1);
+      if (!existing) {
+        res.status(404).json({ error: "This message is no longer in the inbox." });
+        return;
+      }
+      res.status(409).json({ error: "This message is no longer waiting for review." });
+      return;
+    }
+
+    res.json(SaveWhatsAppInboxDraftResponse.parse(formatInboxMessage(updated)));
+  },
+);
+
+router.post(
+  "/whatsapp/inbox/:inboxId/send",
+  async (req, res): Promise<void> => {
+    const params = SendWhatsAppInboxReplyParams.safeParse(req.params);
+    const body = SendWhatsAppInboxReplyBody.safeParse(req.body);
+    if (!params.success || !body.success || !body.data.reply.trim()) {
+      res.status(400).json({ error: "Enter a reply of 1–4000 characters." });
+      return;
+    }
+
+    try {
+      await whatsAppManager.sendReviewedReply(
+        params.data.inboxId,
+        body.data.reply,
+      );
+      res.status(204).send();
+    } catch (error) {
+      if (error instanceof WhatsAppInboxActionError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      req.log.error({ err: error }, "Could not send a reviewed WhatsApp reply.");
+      res.status(503).json({
+        error: "Could not confirm whether the reply was sent. Check WhatsApp before retrying.",
+      });
+    }
+  },
+);
+
+router.delete(
+  "/whatsapp/inbox/:inboxId",
+  async (req, res): Promise<void> => {
+    const params = DismissWhatsAppInboxMessageParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid inbox message." });
+      return;
+    }
+
+    const [dismissed] = await db
+      .delete(whatsAppInboxTable)
+      .where(
+        and(
+          eq(whatsAppInboxTable.id, params.data.inboxId),
+          ne(whatsAppInboxTable.status, "sending"),
+        ),
+      )
+      .returning({ id: whatsAppInboxTable.id });
+    if (!dismissed) {
+      const [existing] = await db
+        .select({ status: whatsAppInboxTable.status })
+        .from(whatsAppInboxTable)
+        .where(eq(whatsAppInboxTable.id, params.data.inboxId))
+        .limit(1);
+      if (!existing) {
+        res.status(404).json({ error: "This message is no longer in the inbox." });
+        return;
+      }
+      res.status(409).json({ error: "A reply is currently being sent." });
+      return;
+    }
+
+    res.status(204).send();
+  },
+);
 
 export default router;

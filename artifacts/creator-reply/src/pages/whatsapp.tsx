@@ -12,6 +12,7 @@ import {
   useDeleteWhatsAppContact,
 } from '@workspace/api-client-react';
 import type { WhatsAppSettingsInputTone } from '@workspace/api-client-react';
+import { MessageInbox } from '@/components/whatsapp/message-inbox';
 import {
   AlertCircle,
   Check,
@@ -54,10 +55,10 @@ function getErrorMessage(error: unknown): string {
 }
 
 function formatDate(value: string | null) {
-  if (!value) return 'No automatic reply sent yet';
+  if (!value) return 'No reply sent yet';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Last reply recorded';
-  return `Last automatic reply · ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date)}`;
+  return `Last reply · ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date)}`;
 }
 
 function WhatsAppPage() {
@@ -202,7 +203,7 @@ function WhatsAppPage() {
                 <span className="h-px w-6 bg-[hsl(var(--primary))]" />a quieter way to keep in touch
               </div>
               <h1 className="font-serif text-[38px] leading-[1.04] tracking-[-.04em] sm:text-[52px]">Your WhatsApp,<br className="hidden sm:block" /> <em className="font-medium text-[hsl(var(--primary))]">on your terms.</em></h1>
-              <p className="mt-4 max-w-[490px] text-[14px] leading-[1.7] text-muted-foreground">Pair a device, choose the adult contacts you approve, and decide whether replies should go out automatically.</p>
+              <p className="mt-4 max-w-[490px] text-[14px] leading-[1.7] text-muted-foreground">Pair a device, approve adult contacts, then review each reply before it goes out or choose automatic sending.</p>
             </div>
             <div className="flex items-center gap-2 self-start rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card)/.8)] px-3.5 py-2 sm:self-auto" data-testid="status-whatsapp-connection">
               <span className={`size-2 rounded-full ${currentStatus?.connection === 'connected' ? 'bg-[hsl(158_34%_43%)]' : currentStatus?.connection === 'error' || status.isError ? 'bg-[hsl(var(--destructive))]' : 'bg-[hsl(35_48%_59%)]'}`} />
@@ -261,7 +262,7 @@ function WhatsAppPage() {
 
                 <section className="reveal-late rounded-[18px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-[var(--shadow-sm)]">
                   <div className="flex items-start justify-between border-b border-[hsl(var(--border))] px-5 py-[17px] sm:px-6">
-                    <div className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-[10px] bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]"><UserRoundCheck size={16} /></span><div><h2 className="text-[14px] font-bold tracking-[-.02em]">Approved contacts</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Only people you name here can receive automatic replies.</p></div></div>
+                    <div className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-[10px] bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]"><UserRoundCheck size={16} /></span><div><h2 className="text-[14px] font-bold tracking-[-.02em]">Approved contacts</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Only adults you approve can appear here or receive automatic replies.</p></div></div>
                     <span className="rounded-full bg-[hsl(var(--muted))] px-2.5 py-1 font-mono text-[9px] uppercase tracking-[.08em] text-muted-foreground" data-testid="status-approved-contact-count">{approvedContacts.length} approved</span>
                   </div>
                   <div className="p-5 sm:p-6">
@@ -290,6 +291,11 @@ function WhatsAppPage() {
                   </div>
                 </section>
               </div>
+
+              <MessageInbox
+                connection={currentStatus?.connection}
+                autoReplyEnabled={!!currentStatus?.autoReplyEnabled}
+              />
 
               <section className="mt-5 rounded-[18px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-[var(--shadow-sm)]" data-testid="section-auto-reply-settings">
                 <div className="flex flex-col justify-between gap-4 border-b border-[hsl(var(--border))] px-5 py-[17px] sm:flex-row sm:items-center sm:px-6">

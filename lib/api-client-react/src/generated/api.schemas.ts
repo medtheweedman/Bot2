@@ -146,3 +146,42 @@ export interface WhatsAppContact {
 
 export type WhatsAppContactList = WhatsAppContact[];
 
+export type WhatsAppInboxMessageStatus = typeof WhatsAppInboxMessageStatus[keyof typeof WhatsAppInboxMessageStatus];
+
+
+export const WhatsAppInboxMessageStatus = {
+  pending: 'pending',
+  sending: 'sending',
+  uncertain: 'uncertain',
+} as const;
+
+export interface WhatsAppInboxMessage {
+  /** @minimum 1 */
+  id: number;
+  phoneNumber: string;
+  /**
+     * @maxLength 80
+     * @nullable
+     */
+  displayName: string | null;
+  /** @maxLength 4000 */
+  messageText: string;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  replyDraft: string | null;
+  status: WhatsAppInboxMessageStatus;
+  receivedAt: string;
+}
+
+export type WhatsAppInboxMessageList = WhatsAppInboxMessage[];
+
+export interface WhatsAppInboxReplyInput {
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  reply: string;
+}
+

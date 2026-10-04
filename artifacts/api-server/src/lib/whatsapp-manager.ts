@@ -17,6 +17,7 @@ import makeWASocket, {
   type WAMessage,
 } from "@whiskeysockets/baileys";
 import {
+  and,
   count,
   eq,
   lt,
@@ -25,6 +26,7 @@ import {
   db,
   whatsAppAuthTable,
   whatsAppContactsTable,
+  whatsAppInboxTable,
   whatsAppProcessedMessagesTable,
   whatsAppSettingsTable,
 } from "@workspace/db";
@@ -43,6 +45,16 @@ type PersistedAuth = {
 };
 
 type SettingsRow = typeof whatsAppSettingsTable.$inferSelect;
+
+export class WhatsAppInboxActionError extends Error {
+  constructor(
+    readonly status: 400 | 404 | 409 | 503,
+    message: string,
+  ) {
+    super(message);
+    this.name = "WhatsAppInboxActionError";
+  }
+}
 
 const SETTINGS_ID = 1;
 const AUTH_ID = 1;
@@ -171,6 +183,10 @@ class WhatsAppManager {
 
   async restore(): Promise<void> {
     await this.ensureSettings();
+    await db
+      .update(whatsAppInboxTable)
+      .set({ status: "uncertain", updatedAt: new Date() })
+      .where(eq(whatsAppInboxTable.status, "sending"));
     const [savedSession] = await db
       .select({ id: whatsAppAuthTable.id })
       .from(whatsAppAuthTable)
@@ -430,9 +446,6 @@ class WhatsAppManager {
     const text = extractText(message);
     if (!text || text.length > 4000) return;
 
-    const settings = await this.ensureSettings();
-    if (!settings.autoReplyEnabled) return;
-
     const [contact] = await db
       .select()
       .from(whatsAppContactsTable)
@@ -440,6 +453,7 @@ class WhatsAppManager {
       .limit(1);
     if (!contact?.adultConfirmed) return;
 
+    const settings = await this.ensureSettings();
     const [claimed] = await db
       .insert(whatsAppProcessedMessagesTable)
       .values({ messageId })
@@ -453,7 +467,24 @@ class WhatsAppManager {
       await db
         .delete(whatsAppContactsTable)
         .where(eq(whatsAppContactsTable.id, contact.id));
-      await this.sendBoundary(socket, jid);
+      if (settings.autoReplyEnabled) {
+        await this.sendBoundary(socket, jid);
+      }
+      return;
+    }
+
+    if (!settings.autoReplyEnabled) {
+      await db
+        .insert(whatsAppInboxTable)
+        .values({
+          messageId,
+          contactId: contact.id,
+          phoneNumber: phoneDigits,
+          displayName: contact.displayName,
+          messageText: text,
+        })
+        .onConflictDoNothing();
+      logger.info("Incoming WhatsApp message added to the review inbox.");
       return;
     }
 
@@ -475,6 +506,156 @@ class WhatsAppManager {
     logger.info("Automatic WhatsApp reply sent.");
   }
 
+  async sendReviewedReply(inboxId: number, replyText: string): Promise<void> {
+    const reply = replyText.trim();
+    if (!reply || reply.length > 4000) {
+      throw new WhatsAppInboxActionError(400, "Enter a reply of 1–4000 characters.");
+    }
+
+    const socket = this.socket;
+    if (!socket || this.connection !== "connected") {
+      throw new WhatsAppInboxActionError(
+        503,
+        "WhatsApp is not connected. Reconnect before sending this reply.",
+      );
+    }
+
+    const [message] = await db
+      .select()
+      .from(whatsAppInboxTable)
+      .where(eq(whatsAppInboxTable.id, inboxId))
+      .limit(1);
+    if (!message) {
+      throw new WhatsAppInboxActionError(404, "This message is no longer in the inbox.");
+    }
+    if (message.status !== "pending") {
+      throw new WhatsAppInboxActionError(
+        409,
+        "This message is already being sent or needs your attention before it can be sent.",
+      );
+    }
+
+    const [contact] = await db
+      .select({ id: whatsAppContactsTable.id })
+      .from(whatsAppContactsTable)
+      .where(
+        and(
+          eq(whatsAppContactsTable.id, message.contactId),
+          eq(whatsAppContactsTable.adultConfirmed, true),
+        ),
+      )
+      .limit(1);
+    if (!contact) {
+      await db
+        .delete(whatsAppInboxTable)
+        .where(eq(whatsAppInboxTable.id, inboxId));
+      throw new WhatsAppInboxActionError(
+        409,
+        "This contact is no longer approved to receive replies.",
+      );
+    }
+
+    const [claimed] = await db
+      .update(whatsAppInboxTable)
+      .set({
+        status: "sending",
+        replyDraft: reply,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(whatsAppInboxTable.id, inboxId),
+          eq(whatsAppInboxTable.status, "pending"),
+        ),
+      )
+      .returning({ id: whatsAppInboxTable.id });
+    if (!claimed) {
+      throw new WhatsAppInboxActionError(
+        409,
+        "This message is already being handled. Refresh the inbox.",
+      );
+    }
+
+    if (this.socket !== socket || this.connection !== "connected") {
+      await db
+        .update(whatsAppInboxTable)
+        .set({ status: "pending", updatedAt: new Date() })
+        .where(
+          and(
+            eq(whatsAppInboxTable.id, inboxId),
+            eq(whatsAppInboxTable.status, "sending"),
+          ),
+        );
+      throw new WhatsAppInboxActionError(
+        503,
+        "WhatsApp disconnected before the reply could be sent. Reconnect and try again.",
+      );
+    }
+
+    try {
+      await socket.sendMessage(`${message.phoneNumber}@s.whatsapp.net`, {
+        text: reply,
+      });
+    } catch (error) {
+      await db
+        .update(whatsAppInboxTable)
+        .set({ status: "uncertain", updatedAt: new Date() })
+        .where(
+          and(
+            eq(whatsAppInboxTable.id, inboxId),
+            eq(whatsAppInboxTable.status, "sending"),
+          ),
+        );
+      logger.warn(
+        { err: error },
+        "Could not confirm delivery of a reviewed WhatsApp reply.",
+      );
+      throw new WhatsAppInboxActionError(
+        503,
+        "WhatsApp could not confirm whether this reply was sent. Check the chat before retrying.",
+      );
+    }
+
+    try {
+      await db
+        .delete(whatsAppInboxTable)
+        .where(
+          and(
+            eq(whatsAppInboxTable.id, inboxId),
+            eq(whatsAppInboxTable.status, "sending"),
+          ),
+        );
+    } catch (error) {
+      await db
+        .update(whatsAppInboxTable)
+        .set({ status: "uncertain", updatedAt: new Date() })
+        .where(
+          and(
+            eq(whatsAppInboxTable.id, inboxId),
+            eq(whatsAppInboxTable.status, "sending"),
+          ),
+        )
+        .catch((updateError) => {
+          logger.error(
+            { err: updateError },
+            "Could not mark an unconfirmed WhatsApp reply as uncertain.",
+          );
+        });
+      logger.error(
+        { err: error },
+        "WhatsApp accepted a reply, but the inbox could not confirm it.",
+      );
+      throw new WhatsAppInboxActionError(
+        503,
+        "WhatsApp accepted the reply for sending, but the inbox could not confirm it. Check the chat before retrying.",
+      );
+    }
+    await this.updateSettings({ lastReplyAt: new Date() }).catch((error) => {
+      logger.warn({ err: error }, "Could not update the last WhatsApp reply time.");
+    });
+    logger.info("Reviewed WhatsApp reply sent.");
+  }
+
   private async sendBoundary(
     socket: ReturnType<typeof makeWASocket>,
     jid: string,
@@ -491,12 +672,16 @@ class WhatsAppManager {
     const now = Date.now();
     if (now - this.lastMessageCleanupAt < 24 * 60 * 60 * 1000) return;
     this.lastMessageCleanupAt = now;
+    const cutoff = new Date(now - 30 * 24 * 60 * 60 * 1000);
     await db
       .delete(whatsAppProcessedMessagesTable)
+      .where(lt(whatsAppProcessedMessagesTable.processedAt, cutoff));
+    await db
+      .delete(whatsAppInboxTable)
       .where(
-        lt(
-          whatsAppProcessedMessagesTable.processedAt,
-          new Date(now - 30 * 24 * 60 * 60 * 1000),
+        and(
+          eq(whatsAppInboxTable.status, "pending"),
+          lt(whatsAppInboxTable.receivedAt, cutoff),
         ),
       );
   }

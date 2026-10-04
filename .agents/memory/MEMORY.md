@@ -1,3 +1,4 @@
 - [Private GitHub imports](private-github-imports.md) — use the authenticated connector for private repos; avoid bursty file requests.
 - [Artifact Vite builds](artifact-vite-builds.md) — standalone production builds need the artifact workflow’s `PORT` and `BASE_PATH` values.
 - [Creator studio PIN policy](creator-studio-pin-policy.md) — the user chose a four-digit numeric PIN; keep the long signing secret and login throttling.
+- [WhatsApp reply delivery safety](whatsapp-reply-delivery.md) — never retry a reply when the messaging provider's delivery result is uncertain.

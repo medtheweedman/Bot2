@@ -28,6 +28,9 @@ import type {
   WhatsAppContact,
   WhatsAppContactInput,
   WhatsAppContactList,
+  WhatsAppInboxMessage,
+  WhatsAppInboxMessageList,
+  WhatsAppInboxReplyInput,
   WhatsAppSettingsInput,
   WhatsAppStatus
 } from './api.schemas';
@@ -1015,5 +1018,408 @@ export const useDeleteWhatsAppContact = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getDeleteWhatsAppContactMutationOptions(options));
+    }
+
+export const getListWhatsAppInboxUrl = () => {
+
+
+
+
+  return `/api/whatsapp/inbox`
+}
+
+/**
+ * @summary List incoming messages waiting for review
+ */
+export const listWhatsAppInbox = async ( options?: Parameters<typeof customFetch>[1]): Promise<WhatsAppInboxMessageList> => {
+
+  return customFetch<WhatsAppInboxMessageList>(getListWhatsAppInboxUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWhatsAppInboxQueryKey = () => {
+    return [
+    `/api/whatsapp/inbox`
+    ] as const;
+    }
+
+
+export const getListWhatsAppInboxQueryOptions = <TData = Awaited<ReturnType<typeof listWhatsAppInbox>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWhatsAppInbox>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWhatsAppInboxQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWhatsAppInbox>>> = ({ signal }) => listWhatsAppInbox({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWhatsAppInbox>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWhatsAppInboxQueryResult = NonNullable<Awaited<ReturnType<typeof listWhatsAppInbox>>>
+export type ListWhatsAppInboxQueryError = ErrorType<void>
+
+
+/**
+ * @summary List incoming messages waiting for review
+ */
+
+export function useListWhatsAppInbox<TData = Awaited<ReturnType<typeof listWhatsAppInbox>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWhatsAppInbox>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWhatsAppInboxQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGenerateWhatsAppInboxDraftUrl = (inboxId: number,) => {
+
+
+
+
+  return `/api/whatsapp/inbox/${inboxId}/draft`
+}
+
+/**
+ * @summary Generate and save a reply draft for an incoming message
+ */
+export const generateWhatsAppInboxDraft = async (inboxId: number, options?: Parameters<typeof customFetch>[1]): Promise<WhatsAppInboxMessage> => {
+
+  return customFetch<WhatsAppInboxMessage>(getGenerateWhatsAppInboxDraftUrl(inboxId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getGenerateWhatsAppInboxDraftMutationKey = () => ['generateWhatsAppInboxDraft'] as const;
+
+export const getGenerateWhatsAppInboxDraftMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateWhatsAppInboxDraft>>, TError,GenerateWhatsAppInboxDraftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateWhatsAppInboxDraft>>, TError,GenerateWhatsAppInboxDraftMutationVariables, TContext> => {
+
+const mutationKey = getGenerateWhatsAppInboxDraftMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateWhatsAppInboxDraft>>, GenerateWhatsAppInboxDraftMutationVariables> = (props) => {
+          const {inboxId} = props ?? {};
+
+          return  generateWhatsAppInboxDraft(inboxId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateWhatsAppInboxDraftMutationResult = NonNullable<Awaited<ReturnType<typeof generateWhatsAppInboxDraft>>>
+
+    export type GenerateWhatsAppInboxDraftMutationError = ErrorType<void>
+    export type GenerateWhatsAppInboxDraftMutationVariables = {inboxId: number}
+
+    /**
+ * @summary Generate and save a reply draft for an incoming message
+ */
+export const useGenerateWhatsAppInboxDraft = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateWhatsAppInboxDraft>>, TError,GenerateWhatsAppInboxDraftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateWhatsAppInboxDraft>>,
+        TError,
+        GenerateWhatsAppInboxDraftMutationVariables,
+        TContext
+      > => {
+      return useMutation(getGenerateWhatsAppInboxDraftMutationOptions(options));
+    }
+
+export const getSaveWhatsAppInboxDraftUrl = (inboxId: number,) => {
+
+
+
+
+  return `/api/whatsapp/inbox/${inboxId}/draft`
+}
+
+/**
+ * @summary Save an edited reply draft
+ */
+export const saveWhatsAppInboxDraft = async (inboxId: number,
+    whatsAppInboxReplyInput: WhatsAppInboxReplyInput, options?: Parameters<typeof customFetch>[1]): Promise<WhatsAppInboxMessage> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<WhatsAppInboxMessage>(getSaveWhatsAppInboxDraftUrl(inboxId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(whatsAppInboxReplyInput)
+  }
+);}
+
+
+
+
+
+export const getSaveWhatsAppInboxDraftMutationKey = () => ['saveWhatsAppInboxDraft'] as const;
+
+export const getSaveWhatsAppInboxDraftMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveWhatsAppInboxDraft>>, TError,SaveWhatsAppInboxDraftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveWhatsAppInboxDraft>>, TError,SaveWhatsAppInboxDraftMutationVariables, TContext> => {
+
+const mutationKey = getSaveWhatsAppInboxDraftMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveWhatsAppInboxDraft>>, SaveWhatsAppInboxDraftMutationVariables> = (props) => {
+          const {inboxId,data} = props ?? {};
+
+          return  saveWhatsAppInboxDraft(inboxId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveWhatsAppInboxDraftMutationResult = NonNullable<Awaited<ReturnType<typeof saveWhatsAppInboxDraft>>>
+    export type SaveWhatsAppInboxDraftMutationBody = BodyType<WhatsAppInboxReplyInput>
+    export type SaveWhatsAppInboxDraftMutationError = ErrorType<void>
+    export type SaveWhatsAppInboxDraftMutationVariables = {inboxId: number;data: BodyType<WhatsAppInboxReplyInput>}
+
+    /**
+ * @summary Save an edited reply draft
+ */
+export const useSaveWhatsAppInboxDraft = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveWhatsAppInboxDraft>>, TError,SaveWhatsAppInboxDraftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveWhatsAppInboxDraft>>,
+        TError,
+        SaveWhatsAppInboxDraftMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSaveWhatsAppInboxDraftMutationOptions(options));
+    }
+
+export const getSendWhatsAppInboxReplyUrl = (inboxId: number,) => {
+
+
+
+
+  return `/api/whatsapp/inbox/${inboxId}/send`
+}
+
+/**
+ * @summary Send a reviewed reply to an incoming message
+ */
+export const sendWhatsAppInboxReply = async (inboxId: number,
+    whatsAppInboxReplyInput: WhatsAppInboxReplyInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<void>(getSendWhatsAppInboxReplyUrl(inboxId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(whatsAppInboxReplyInput)
+  }
+);}
+
+
+
+
+
+export const getSendWhatsAppInboxReplyMutationKey = () => ['sendWhatsAppInboxReply'] as const;
+
+export const getSendWhatsAppInboxReplyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendWhatsAppInboxReply>>, TError,SendWhatsAppInboxReplyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendWhatsAppInboxReply>>, TError,SendWhatsAppInboxReplyMutationVariables, TContext> => {
+
+const mutationKey = getSendWhatsAppInboxReplyMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendWhatsAppInboxReply>>, SendWhatsAppInboxReplyMutationVariables> = (props) => {
+          const {inboxId,data} = props ?? {};
+
+          return  sendWhatsAppInboxReply(inboxId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendWhatsAppInboxReplyMutationResult = NonNullable<Awaited<ReturnType<typeof sendWhatsAppInboxReply>>>
+    export type SendWhatsAppInboxReplyMutationBody = BodyType<WhatsAppInboxReplyInput>
+    export type SendWhatsAppInboxReplyMutationError = ErrorType<void>
+    export type SendWhatsAppInboxReplyMutationVariables = {inboxId: number;data: BodyType<WhatsAppInboxReplyInput>}
+
+    /**
+ * @summary Send a reviewed reply to an incoming message
+ */
+export const useSendWhatsAppInboxReply = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendWhatsAppInboxReply>>, TError,SendWhatsAppInboxReplyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendWhatsAppInboxReply>>,
+        TError,
+        SendWhatsAppInboxReplyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSendWhatsAppInboxReplyMutationOptions(options));
+    }
+
+export const getDismissWhatsAppInboxMessageUrl = (inboxId: number,) => {
+
+
+
+
+  return `/api/whatsapp/inbox/${inboxId}`
+}
+
+/**
+ * @summary Dismiss a message from the review inbox
+ */
+export const dismissWhatsAppInboxMessage = async (inboxId: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDismissWhatsAppInboxMessageUrl(inboxId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDismissWhatsAppInboxMessageMutationKey = () => ['dismissWhatsAppInboxMessage'] as const;
+
+export const getDismissWhatsAppInboxMessageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dismissWhatsAppInboxMessage>>, TError,DismissWhatsAppInboxMessageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof dismissWhatsAppInboxMessage>>, TError,DismissWhatsAppInboxMessageMutationVariables, TContext> => {
+
+const mutationKey = getDismissWhatsAppInboxMessageMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof dismissWhatsAppInboxMessage>>, DismissWhatsAppInboxMessageMutationVariables> = (props) => {
+          const {inboxId} = props ?? {};
+
+          return  dismissWhatsAppInboxMessage(inboxId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DismissWhatsAppInboxMessageMutationResult = NonNullable<Awaited<ReturnType<typeof dismissWhatsAppInboxMessage>>>
+
+    export type DismissWhatsAppInboxMessageMutationError = ErrorType<void>
+    export type DismissWhatsAppInboxMessageMutationVariables = {inboxId: number}
+
+    /**
+ * @summary Dismiss a message from the review inbox
+ */
+export const useDismissWhatsAppInboxMessage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dismissWhatsAppInboxMessage>>, TError,DismissWhatsAppInboxMessageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof dismissWhatsAppInboxMessage>>,
+        TError,
+        DismissWhatsAppInboxMessageMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDismissWhatsAppInboxMessageMutationOptions(options));
     }
 
