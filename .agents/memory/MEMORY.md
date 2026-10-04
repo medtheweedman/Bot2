@@ -1,0 +1,1 @@
+- [Private GitHub imports](private-github-imports.md) — use the authenticated connector for private repos; avoid bursty file requests.
