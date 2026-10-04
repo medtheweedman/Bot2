@@ -23,6 +23,7 @@ export interface WhatsAppInboxMessage {
      * @nullable
      */
   replyDraft: string | null;
+  isAdultApproved: boolean;
   status: WhatsAppInboxMessageStatus;
   receivedAt: Date;
 }

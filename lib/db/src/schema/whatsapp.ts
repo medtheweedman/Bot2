@@ -49,6 +49,7 @@ export const whatsAppInboxStatus = pgEnum("whatsapp_inbox_status", [
   "pending",
   "sending",
   "uncertain",
+  "replied",
 ]);
 
 export const whatsAppInboxTable = pgTable(
@@ -56,9 +57,9 @@ export const whatsAppInboxTable = pgTable(
   {
     id: serial("id").primaryKey(),
     messageId: varchar("message_id", { length: 128 }).notNull().unique(),
-    contactId: integer("contact_id")
-      .notNull()
-      .references(() => whatsAppContactsTable.id, { onDelete: "cascade" }),
+    contactId: integer("contact_id").references(() => whatsAppContactsTable.id, {
+      onDelete: "set null",
+    }),
     phoneNumber: varchar("phone_number", { length: 15 }).notNull(),
     displayName: varchar("display_name", { length: 80 }),
     messageText: text("message_text").notNull(),

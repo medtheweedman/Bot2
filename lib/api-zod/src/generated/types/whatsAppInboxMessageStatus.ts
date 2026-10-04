@@ -13,4 +13,5 @@ export const WhatsAppInboxMessageStatus = {
   pending: 'pending',
   sending: 'sending',
   uncertain: 'uncertain',
+  replied: 'replied',
 } as const;

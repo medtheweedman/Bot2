@@ -153,6 +153,7 @@ export const WhatsAppInboxMessageStatus = {
   pending: 'pending',
   sending: 'sending',
   uncertain: 'uncertain',
+  replied: 'replied',
 } as const;
 
 export interface WhatsAppInboxMessage {
@@ -171,6 +172,7 @@ export interface WhatsAppInboxMessage {
      * @nullable
      */
   replyDraft: string | null;
+  isAdultApproved: boolean;
   status: WhatsAppInboxMessageStatus;
   receivedAt: string;
 }

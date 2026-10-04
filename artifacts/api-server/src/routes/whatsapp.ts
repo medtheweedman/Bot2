@@ -42,6 +42,7 @@ function normalizePhoneNumber(input: string): string | null {
 
 function formatInboxMessage(
   message: typeof whatsAppInboxTable.$inferSelect,
+  isAdultApproved: boolean,
 ) {
   return {
     id: message.id,
@@ -49,9 +50,20 @@ function formatInboxMessage(
     displayName: message.displayName,
     messageText: message.messageText,
     replyDraft: message.replyDraft,
+    isAdultApproved,
     status: message.status,
     receivedAt: message.receivedAt.toISOString(),
   };
+}
+
+async function isAdultApprovedContact(contactId: number | null): Promise<boolean> {
+  if (contactId === null) return false;
+  const [contact] = await db
+    .select({ adultConfirmed: whatsAppContactsTable.adultConfirmed })
+    .from(whatsAppContactsTable)
+    .where(eq(whatsAppContactsTable.id, contactId))
+    .limit(1);
+  return contact?.adultConfirmed === true;
 }
 
 router.get("/whatsapp/status", async (_req, res): Promise<void> => {
@@ -233,11 +245,24 @@ router.delete("/whatsapp/contacts/:contactId", async (req, res): Promise<void> =
 
 router.get("/whatsapp/inbox", async (_req, res): Promise<void> => {
   const messages = await db
-    .select()
+    .select({
+      message: whatsAppInboxTable,
+      adultConfirmed: whatsAppContactsTable.adultConfirmed,
+    })
     .from(whatsAppInboxTable)
+    .leftJoin(
+      whatsAppContactsTable,
+      eq(whatsAppInboxTable.contactId, whatsAppContactsTable.id),
+    )
     .orderBy(desc(whatsAppInboxTable.receivedAt))
-    .limit(100);
-  res.json(ListWhatsAppInboxResponse.parse(messages.map(formatInboxMessage)));
+    ;
+  res.json(
+    ListWhatsAppInboxResponse.parse(
+      messages.map(({ message, adultConfirmed }) =>
+        formatInboxMessage(message, adultConfirmed === true),
+      ),
+    ),
+  );
 });
 
 router.post(
@@ -260,6 +285,13 @@ router.post(
     }
     if (message.status !== "pending") {
       res.status(409).json({ error: "This message is no longer waiting for review." });
+      return;
+    }
+    if (!(await isAdultApprovedContact(message.contactId))) {
+      res.status(403).json({
+        error:
+          "AI drafts are limited to contacts approved as adults. You can write a manual reply instead.",
+      });
       return;
     }
 
@@ -303,6 +335,7 @@ router.post(
         and(
           eq(whatsAppInboxTable.id, params.data.inboxId),
           eq(whatsAppInboxTable.status, "pending"),
+          eq(whatsAppInboxTable.contactId, message.contactId!),
         ),
       )
       .returning();
@@ -311,8 +344,11 @@ router.post(
       return;
     }
 
+    const isAdultApproved = await isAdultApprovedContact(updated.contactId);
     res.json(
-      GenerateWhatsAppInboxDraftResponse.parse(formatInboxMessage(updated)),
+      GenerateWhatsAppInboxDraftResponse.parse(
+        formatInboxMessage(updated, isAdultApproved),
+      ),
     );
   },
 );
@@ -351,7 +387,12 @@ router.patch(
       return;
     }
 
-    res.json(SaveWhatsAppInboxDraftResponse.parse(formatInboxMessage(updated)));
+    const isAdultApproved = await isAdultApprovedContact(updated.contactId);
+    res.json(
+      SaveWhatsAppInboxDraftResponse.parse(
+        formatInboxMessage(updated, isAdultApproved),
+      ),
+    );
   },
 );
 

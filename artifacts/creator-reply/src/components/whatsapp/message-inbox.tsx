@@ -75,6 +75,7 @@ function InboxMessageCard({
   const busy = generating || saving || sending || dismissing;
   const uncertain = message.status === "uncertain";
   const activelySending = message.status === "sending";
+  const replied = message.status === "replied";
 
   return (
     <article
@@ -105,13 +106,21 @@ function InboxMessageCard({
           className={`rounded-full px-2.5 py-1 font-mono text-[9px] uppercase tracking-[.08em] ${
             uncertain
               ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
-              : activelySending
-                ? "bg-[hsl(var(--muted))] text-muted-foreground"
-                : "bg-[hsl(35_48%_59%/.15)] text-[hsl(35_48%_34%)]"
+              : replied
+                ? "bg-[hsl(158_34%_43%/.12)] text-[hsl(158_34%_33%)]"
+                : activelySending
+                  ? "bg-[hsl(var(--muted))] text-muted-foreground"
+                  : "bg-[hsl(35_48%_59%/.15)] text-[hsl(35_48%_34%)]"
           }`}
           data-testid={`status-inbox-message-${message.id}`}
         >
-          {uncertain ? "Check WhatsApp" : activelySending ? "Sending" : "Needs review"}
+          {uncertain
+            ? "Check WhatsApp"
+            : replied
+              ? "Replied"
+              : activelySending
+                ? "Sending"
+                : "Needs review"}
         </span>
       </div>
 
@@ -122,7 +131,35 @@ function InboxMessageCard({
         {message.messageText}
       </div>
 
-      {activelySending ? (
+      {replied ? (
+        <div className="mt-3 rounded-[10px] border border-[hsl(158_34%_43%/.16)] bg-[hsl(158_34%_43%/.06)] px-3.5 py-3">
+          <p className="text-[9px] font-bold uppercase tracking-[.08em] text-[hsl(158_34%_33%)]">
+            Reply sent
+          </p>
+          {message.replyDraft && (
+            <p
+              className="mt-1.5 whitespace-pre-wrap break-words text-[11px] leading-relaxed"
+              data-testid={`text-inbox-sent-reply-${message.id}`}
+            >
+              {message.replyDraft}
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={dismissing}
+            onClick={onDismiss}
+            data-testid={`button-dismiss-replied-inbox-message-${message.id}`}
+            className="mt-2 flex h-8 items-center gap-2 rounded-[8px] px-2.5 text-[10px] font-semibold text-muted-foreground transition hover:bg-[hsl(var(--destructive)/.08)] hover:text-[hsl(var(--destructive))] disabled:opacity-50"
+          >
+            {dismissing ? (
+              <LoaderCircle size={12} className="animate-spin" />
+            ) : (
+              <Trash2 size={12} />
+            )}
+            Dismiss conversation
+          </button>
+        </div>
+      ) : activelySending ? (
         <div
           role="status"
           className="mt-3 flex items-start gap-2 rounded-[9px] bg-[hsl(var(--muted)/.68)] px-3 py-2.5 text-[10px] leading-relaxed text-muted-foreground"
@@ -139,9 +176,24 @@ function InboxMessageCard({
           Delivery could not be confirmed. Check the WhatsApp chat before
           dismissing this item. Do not send the reply again unless you confirm it
           was not delivered.
+          {message.replyDraft && (
+            <p className="mt-2 border-t border-[hsl(var(--accent-foreground)/.14)] pt-2">
+              Reply submitted: {message.replyDraft}
+            </p>
+          )}
         </div>
       ) : (
         <div className="mt-4">
+          {!message.isAdultApproved && (
+            <p
+              role="note"
+              className="mb-3 rounded-[9px] bg-[hsl(var(--muted)/.68)] px-3 py-2.5 text-[10px] leading-relaxed text-muted-foreground"
+              data-testid={`status-inbox-ai-adult-gate-${message.id}`}
+            >
+              AI drafts and automatic replies are limited to contacts approved
+              as adults. You can still write and send a manual reply here.
+            </p>
+          )}
           <label
             htmlFor={`inbox-reply-${message.id}`}
             className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[.08em] text-muted-foreground"
@@ -161,7 +213,12 @@ function InboxMessageCard({
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || !message.isAdultApproved}
+              title={
+                message.isAdultApproved
+                  ? "Generate an AI reply draft"
+                  : "AI drafts are limited to adult-approved contacts"
+              }
               onClick={onGenerate}
               data-testid={`button-generate-inbox-reply-${message.id}`}
               className="flex h-9 items-center gap-2 rounded-[9px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 text-[10px] font-bold transition hover:border-[hsl(var(--primary)/.4)] disabled:cursor-wait disabled:opacity-50"
@@ -171,7 +228,11 @@ function InboxMessageCard({
               ) : (
                 <WandSparkles size={13} />
               )}
-              {generating ? "Drafting…" : "Generate AI draft"}
+              {generating
+                ? "Drafting…"
+                : message.isAdultApproved
+                  ? "Generate AI draft"
+                  : "AI draft unavailable"}
             </button>
             <button
               type="button"
@@ -199,7 +260,7 @@ function InboxMessageCard({
               ) : (
                 <Send size={13} />
               )}
-              {sending ? "Sending…" : "Approve & send"}
+              {sending ? "Sending…" : "Confirm & send"}
             </button>
             <button
               type="button"
@@ -314,7 +375,7 @@ export function MessageInbox({
       { inboxId: message.id, data: { reply: reply.trim() } },
       {
         onSuccess: () => {
-          setActionMessage("Reply sent. The item was removed from the inbox.");
+          setActionMessage("Reply sent. The conversation remains in the inbox.");
           refreshInbox();
         },
         onError: (error) => {
@@ -331,7 +392,9 @@ export function MessageInbox({
     const confirmation =
       message.status === "uncertain"
         ? "Have you checked WhatsApp? This only removes the inbox item and will not retry the reply."
-        : "Dismiss this incoming message? No reply will be sent.";
+        : message.status === "replied"
+          ? "Remove this replied conversation from the inbox?"
+          : "Dismiss this incoming message? No reply will be sent.";
     if (!window.confirm(confirmation)) return;
     setActionError("");
     setActionMessage("");
@@ -362,7 +425,7 @@ export function MessageInbox({
               Incoming messages
             </h2>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Review every reply before it leaves the studio.
+              Every incoming direct text message appears here.
             </p>
           </div>
         </div>
@@ -376,10 +439,10 @@ export function MessageInbox({
 
       <div className="space-y-4 p-5 sm:p-6">
         <p className="text-[10px] leading-relaxed text-muted-foreground">
-          Text messages from contacts you approved as adults appear here when
-          automatic replies are off. Nothing is sent until you review it and
-          choose <strong className="text-foreground">Approve &amp; send</strong>.
-          You can write your own reply if AI drafting is not configured.
+          Incoming direct text messages appear here whether or not the contact
+          is approved. You can always write a manual reply and confirm before
+          sending. AI drafts and automatic replies require an adult-approved
+          contact.
         </p>
 
         {autoReplyEnabled && (
@@ -388,9 +451,9 @@ export function MessageInbox({
             className="rounded-[10px] border border-[hsl(var(--accent-foreground)/.13)] bg-[hsl(var(--accent)/.48)] px-3.5 py-3 text-[10px] leading-relaxed text-[hsl(var(--accent-foreground))]"
             data-testid="status-inbox-auto-reply-enabled"
           >
-            Automatic replies are on. New messages are sent without review
-            instead of appearing here. Turn automatic replies off below to use
-            this approval inbox.
+            Automatic replies are on for adult-approved contacts. Those replies
+            are still recorded here; messages from other contacts stay waiting
+            for your manual review.
           </div>
         )}
 
@@ -485,10 +548,10 @@ export function MessageInbox({
             <span className="mx-auto mb-2 grid size-9 place-items-center rounded-full bg-[hsl(var(--muted))] text-muted-foreground">
               <Sparkles size={15} />
             </span>
-            <p className="text-[11px] font-semibold">No messages waiting for review.</p>
+            <p className="text-[11px] font-semibold">No messages in the inbox yet.</p>
             <p className="mx-auto mt-1 max-w-[280px] text-[10px] leading-relaxed text-muted-foreground">
-              New text messages from approved adult contacts will appear here
-              while automatic replies are off.
+              New incoming direct text messages will appear here, including
+              messages from contacts you have not approved.
             </p>
           </div>
         )}

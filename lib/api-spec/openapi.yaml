@@ -504,13 +504,15 @@ components:
         replyDraft:
           type: ["string", "null"]
           maxLength: 4000
+        isAdultApproved:
+          type: boolean
         status:
           type: string
-          enum: [pending, sending, uncertain]
+          enum: [pending, sending, uncertain, replied]
         receivedAt:
           type: string
           format: date-time
-      required: [id, phoneNumber, displayName, messageText, replyDraft, status, receivedAt]
+      required: [id, phoneNumber, displayName, messageText, replyDraft, isAdultApproved, status, receivedAt]
     WhatsAppInboxMessageList:
       type: array
       items:

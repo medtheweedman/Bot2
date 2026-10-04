@@ -262,7 +262,7 @@ function WhatsAppPage() {
 
                 <section className="reveal-late rounded-[18px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-[var(--shadow-sm)]">
                   <div className="flex items-start justify-between border-b border-[hsl(var(--border))] px-5 py-[17px] sm:px-6">
-                    <div className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-[10px] bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]"><UserRoundCheck size={16} /></span><div><h2 className="text-[14px] font-bold tracking-[-.02em]">Approved contacts</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Only adults you approve can appear here or receive automatic replies.</p></div></div>
+                    <div className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-[10px] bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]"><UserRoundCheck size={16} /></span><div><h2 className="text-[14px] font-bold tracking-[-.02em]">Adult-approved contacts</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Approval enables AI drafts and automatic replies. All incoming texts still appear in the inbox.</p></div></div>
                     <span className="rounded-full bg-[hsl(var(--muted))] px-2.5 py-1 font-mono text-[9px] uppercase tracking-[.08em] text-muted-foreground" data-testid="status-approved-contact-count">{approvedContacts.length} approved</span>
                   </div>
                   <div className="p-5 sm:p-6">

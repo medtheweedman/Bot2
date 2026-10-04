@@ -252,7 +252,8 @@ export const ListWhatsAppInboxResponseItem = zod.object({
   "displayName": zod.string().max(listWhatsAppInboxResponseDisplayNameMax).nullable(),
   "messageText": zod.string().max(listWhatsAppInboxResponseMessageTextMax),
   "replyDraft": zod.string().max(listWhatsAppInboxResponseReplyDraftMax).nullable(),
-  "status": zod.enum(['pending', 'sending', 'uncertain']),
+  "isAdultApproved": zod.boolean(),
+  "status": zod.enum(['pending', 'sending', 'uncertain', 'replied']),
   "receivedAt": zod.coerce.date()
 })
 export const ListWhatsAppInboxResponse = zod.array(ListWhatsAppInboxResponseItem)
@@ -283,7 +284,8 @@ export const GenerateWhatsAppInboxDraftResponse = zod.object({
   "displayName": zod.string().max(generateWhatsAppInboxDraftResponseDisplayNameMax).nullable(),
   "messageText": zod.string().max(generateWhatsAppInboxDraftResponseMessageTextMax),
   "replyDraft": zod.string().max(generateWhatsAppInboxDraftResponseReplyDraftMax).nullable(),
-  "status": zod.enum(['pending', 'sending', 'uncertain']),
+  "isAdultApproved": zod.boolean(),
+  "status": zod.enum(['pending', 'sending', 'uncertain', 'replied']),
   "receivedAt": zod.coerce.date()
 })
 
@@ -321,7 +323,8 @@ export const SaveWhatsAppInboxDraftResponse = zod.object({
   "displayName": zod.string().max(saveWhatsAppInboxDraftResponseDisplayNameMax).nullable(),
   "messageText": zod.string().max(saveWhatsAppInboxDraftResponseMessageTextMax),
   "replyDraft": zod.string().max(saveWhatsAppInboxDraftResponseReplyDraftMax).nullable(),
-  "status": zod.enum(['pending', 'sending', 'uncertain']),
+  "isAdultApproved": zod.boolean(),
+  "status": zod.enum(['pending', 'sending', 'uncertain', 'replied']),
   "receivedAt": zod.coerce.date()
 })
 
